@@ -14,6 +14,17 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.tox/
+.nox/
+
+# test / coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# packaging
+*.egg-info/
+pip-wheel-metadata/
 
 # build
 dist/
@@ -31,3 +42,6 @@ data/index/
 data/embeddings/
 *.sqlite
 *.db
+*.log
+log.txt
+support_tickets/output.csv

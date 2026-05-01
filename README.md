@@ -1,134 +1,328 @@
-# HackerRank Orchestrate
+# Secure RAG-Based AI Support Triage System
 
-Starter repository for the **HackerRank Orchestrate** 24-hour hackathon (May 1–2, 2026).
-
-Build a terminal-based AI agent that triages real support tickets across three product ecosystems; **HackerRank**, **Claude**, and **Visa** — using only the support corpus shipped in this repo.
-
-Read [`problem_statement.md`](./problem_statement.md) for the full task spec, input/output schema, and allowed values, and [`evalutation_criteria.md`](./evalutation_criteria.md) for how submissions are scored.
+An AI-driven support ticket triage system that classifies customer issues, retrieves relevant documentation, applies security screening, and autonomously generates grounded responses or flags tickets for human escalation.
 
 ---
 
-## Contents
+## Table of Contents
 
-1. [Repository layout](#repository-layout)
-2. [What you need to build](#what-you-need-to-build)
-3. [Where your code goes](#where-your-code-goes)
-4. [Quickstart](#quickstart)
-5. [Chat transcript logging](#chat-transcript-logging)
-6. [Submission](#submission)
-7. [Judge interview](#judge-interview)
-8. [Evaluation criteria](#evaluation-criteria)
+- [Problem Statement](#problem-statement)
+- [Proposed Solution](#proposed-solution)
+- [How It Works](#how-it-works)
+- [Pipeline](#pipeline)
+- [Results and Metrics](#results-and-metrics)
+- [Datasets](#datasets)
+- [Project Structure](#project-structure)
+- [Setup and Usage](#setup-and-usage)
+- [Limitations](#limitations)
+- [Future Improvements](#future-improvements)
 
 ---
 
-## Repository layout
+## Problem Statement
+
+Support teams across organizations handle thousands of incoming tickets daily, many of which are repetitive FAQs or routine requests that do not require human intervention. Manual triage is time-consuming and error-prone, leading to:
+
+- **High operational cost** — human agents spend time on tickets that could be auto-resolved.
+- **Slow response times** — common issues remain unaddressed in queues.
+- **Inconsistent replies** — different team members answer the same question differently.
+- **Security risk** — malicious or trick requests may not be caught in time.
+- **Knowledge fragmentation** — support docs are scattered and hard to search at scale.
+
+The goal is to automate the triage and initial response process while maintaining safety, consistency, and grounding in verified documentation.
+
+---
+
+## Proposed Solution
+
+The Secure RAG-Based AI Support Triage System combines:
+
+1. **Classification Engine** — routes tickets to the correct product area and request type using keyword-based heuristics.
+2. **Security Layer** — detects prompt injection, fraud, data exfiltration, and policy violations before response generation.
+3. **Retrieval-Augmented Generation (RAG)** — grounds responses in local, verified documentation.
+4. **LLM Integration** — generates concise, contextual replies when confident; escalates when uncertain or unsafe.
+5. **Logging & Auditability** — logs all decisions in SOC-style format for compliance and debugging.
+
+The system is deterministic, offline-capable, and avoids hallucination by design.
+
+---
+
+## How It Works
+
+The system processes support tickets in a linear pipeline:
 
 ```
-.
-├── AGENTS.md                       # Rules for AI coding tools + transcript logging
-├── problem_statement.md            # Full task description and I/O schema
-├── README.md                       # You are here
-├── code/                           # ← Build your agent here
-│   └── main.py                     #   Entry point (rename/extend as you like)
-├── data/                           # Local-only support corpus (no network needed)
-│   ├── hackerrank/                 #   HackerRank help center
-│   ├── claude/                     #   Claude Help Center export
-│   └── visa/                       #   Visa consumer + small-business support
-└── support_tickets/
-    ├── sample_support_tickets.csv  # Inputs + expected outputs (for development)
-    ├── support_tickets.csv         # Inputs only (run your agent on these)
-    └── output.csv                  # Write your agent's predictions here
+CSV Input → Classification → Security Check → Risk Scoring
+                                    ↓
+                            Yes: Escalate
+                                    ↓ No
+                            Document Retrieval
+                                    ↓
+                    Grounded Response Generation
+                                    ↓
+                        CSV Output + Audit Log
+```
+
+**Step 1: Ticket Input**  
+Reads `support_tickets/support_tickets.csv` with columns: `Issue`, `Subject`, `Company`.
+
+**Step 2: Request Classification**  
+Maps the ticket to:
+- A **request type**: `product_issue`, `feature_request`, `bug`, or `invalid`.
+- A **product area**: e.g., `account_management`, `billing`, `security`, `privacy`, etc.
+
+Uses keyword matching and company context to route the ticket.
+
+**Step 3: Security Screening**  
+Evaluates the ticket for malicious or risky intent:
+- Detects instruction override attempts.
+- Flags fraud, data theft, or policy violation language.
+- Computes a 0–100 **risk score**.
+- Sets an **attack type** label: `prompt_injection`, `fraud_risk`, `data_exfiltration`, `policy_violation`, or `benign`.
+
+**Step 4: Escalation Decision**  
+If risk score exceeds the threshold (60 in secure mode, 70 in normal mode), the ticket is escalated. Otherwise, proceeds to retrieval.
+
+**Step 5: Document Retrieval**  
+Loads the local corpus and retrieves the top 3 matching documents using simple word overlap scoring:
+- Scoped to the company's corpus first (HackerRank, Claude, or Visa).
+- Falls back to global corpus if no strong match found.
+
+**Step 6: Response Generation**  
+If an OpenRouter API key is available, calls the LLM to generate a short response grounded in the retrieved docs. Otherwise, falls back to a summary of the best match.
+
+**Step 7: Output & Logging**  
+Writes the final decision row to the output CSV and logs the decision in SOC format.
+
+---
+
+## Pipeline
+
+### Component: `code/classification.py`
+- **Input:** Issue text, company name
+- **Output:** request_type, product_area
+- **Logic:** Keyword matching and company-specific heuristics
+
+### Component: `code/security.py`
+- **Input:** Issue text, request_type, company name
+- **Output:** (escalate: bool, attack_type: str, risk_score: int)
+- **Logic:** Regex pattern matching for malicious phrases, threat classification, risk scoring
+
+### Component: `code/retrieval.py`
+- **Input:** Issue text, domain corpus, company name
+- **Output:** List of top 3 matching documents
+- **Logic:** Word-overlap scoring, company-scoped fallback
+
+### Component: `code/llm.py`
+- **Input:** Issue text, retrieved docs, company name
+- **Output:** Grounded response string
+- **Logic:** Calls OpenRouter API if key is present; else returns doc summary
+
+### Component: `code/main.py`
+- **Orchestrates** the pipeline
+- **Reads** CSV input and loads corpus
+- **Writes** output CSV and SOC log
+- **Handles** errors gracefully
+
+---
+
+## Results and Metrics
+
+When running on a sample of 29 support tickets:
+
+- **Total Tickets Processed:** 29
+- **Successfully Replied:** 24 (83%)
+- **Escalated:** 5 (17%)
+
+**Escalation Breakdown:**
+- Policy Violations: 2
+- Fraud Risk: 3
+
+**Example Output Row:**
+```csv
+ticket_id,status,product_area,request_type,response,justification,security_flag,attack_type,risk_score
+1,replied,account_management,product_issue,"Thank you for contacting support...",Type='product_issue'...,false,benign,25
+```
+
+**Audit Log Example:**
+```
+[2026-05-01T17:20:51+05:30] [TRIAGE]
+Ticket 1 | Company: Claude
+Decision: REPLIED
+Security Flag: false
+Attack Type: benign
+Risk Score: 25
+Security Reason: No active security threat detected
+Request Type: product_issue | Product Area: account_management
 ```
 
 ---
 
-## What you need to build
+## Datasets
 
-A terminal-based agent that, for each row in `support_tickets/support_tickets.csv`, produces:
+The system is bundled with local support documentation for three companies:
 
-| Column         | Allowed values                                          |
-| -------------- | ------------------------------------------------------- |
-| `status`       | `replied`, `escalated`                                  |
-| `product_area` | most relevant support category / domain area            |
-| `response`     | user-facing answer grounded in the provided corpus      |
-| `justification`| concise explanation of the routing/answering decision   |
-| `request_type` | `product_issue`, `feature_request`, `bug`, `invalid`    |
+### Claude Support Corpus
+- **Source:** Claude Help Center snapshots
+- **Topics:** Account management, API integration, privacy, security, conversation management, platform reliability
+- **Count:** ~320 markdown files
 
-Hard requirements (from `problem_statement.md`):
+### HackerRank Support Corpus
+- **Source:** HackerRank Support site snapshots
+- **Topics:** Assessments, billing, interviews, hiring, account management, certifications, community
+- **Count:** ~438 markdown files
 
-- Must be **terminal-based**.
-- Must use **only the provided support corpus** (no live web calls for ground-truth answers).
-- Must **escalate** high-risk, sensitive, or unsupported cases instead of guessing.
-- Must avoid hallucinated policies or unsupported claims.
+### Visa Support Corpus
+- **Source:** Visa consumer and small-business support
+- **Topics:** Travel support, dispute resolution, fraud security, cash access, card policy, card access
+- **Count:** ~14 markdown files
 
-Beyond that you are free to bring your own approach — RAG, vector DBs, tool use, structured output, agent frameworks, classical ML, or anything else.
+**Total:** ~772 markdown documents across all three corpora.
 
----
+**Data Format:** Plain markdown with metadata headers (title, URL, timestamps).
 
-## Where your code goes
-
-All of your work belongs in [`code/`](./code/). The repo ships with an empty `code/main.py` you can grow into your full agent — add more modules (`agent.py`, `retriever.py`, `classifier.py`, etc.) next to it as needed.
-
-Conventions:
-
-- Put a **README inside `code/`** describing how to install dependencies and run your agent.
-- Read secrets **from environment variables only** (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, …). Copy `.env.example` → `.env` (already gitignored) if you keep one. **Never hardcode keys.**
-- Be **deterministic** where possible. Seed any random sampling.
-- Write responses to `support_tickets/output.csv`.
+**No Personal Data:** All support documentation is public-facing; no customer PII is included.
 
 ---
 
-## Quickstart
+## Project Structure
 
-Clone this repository:
+```text
+Secure RAG-Based AI Support Triage System/
+├── README.md                           # This file
+├── .env.example                        # Environment template
+├── .gitignore                          # Git ignore rules
+├── code/                               # Source code
+│   ├── __init__.py
+│   ├── main.py                         # Pipeline orchestration
+│   ├── classification.py               # Ticket routing
+│   ├── security.py                     # Threat detection & risk scoring
+│   ├── retrieval.py                    # Document loading & ranking
+│   └── llm.py                          # Response generation
+├── data/                               # Local support corpus
+│   ├── claude/                         # Claude Help Center docs
+│   │   ├── index.md
+│   │   ├── account-management/
+│   │   ├── api-faq/
+│   │   ├── privacy-and-legal/
+│   │   └── ...
+│   ├── hackerrank/                     # HackerRank support docs
+│   │   ├── index.md
+│   │   ├── billing/
+│   │   ├── screen/
+│   │   ├── interview/
+│   │   └── ...
+│   └── visa/                           # Visa support docs
+│       ├── index.md
+│       ├── support/
+│       └── ...
+└── support_tickets/                    # Input & output
+    ├── support_tickets.csv             # Input: tickets to triage
+    ├── sample_support_tickets.csv      # Reference examples
+    └── output.csv                      # Output: final decisions (generated)
+```
+
+**Generated Files (not committed):**
+- `support_tickets/output.csv`
+- `log.txt`
+- `code/__pycache__/`
+
+---
+
+## Setup and Usage
+
+### Prerequisites
+
+- Python 3.8 or later
+- `pip` or `conda` for package management
+- Optional: OpenRouter API key for live response generation
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/Mallikarjun501/Secure-RAG-Based-AI-Support-Triage-System.git
+   cd Secure-RAG-Based-AI-Support-Triage-System
+   ```
+
+2. Create a virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. Install dependencies:
+   ```bash
+   pip install pandas openai
+   ```
+
+4. Set up environment variables:
+   ```bash
+   cp .env.example .env
+   ```
+   Then edit `.env` and set:
+   ```
+   OPENAI_API_KEY=sk-...
+   OPENROUTER_MODEL=meta-llama/llama-3-8b-instruct
+   MODE=secure
+   ```
+
+### Running the Agent
 
 ```bash
-git clone git@github.com:interviewstreet/hackerrank-orchestrate-may26.git
-cd hackerrank-orchestrate-may26
+python ..\run.py
 ```
 
-You are free to use any language or runtime. We recommend **Python**, **JavaScript**, or **TypeScript**.
+If you prefer to run from inside the nested project folder, you can also use:
+
+```bash
+python code/main.py
+```
+
+**Output:**
+- `support_tickets/output.csv` — predictions for all input tickets
+- `log.txt` — detailed run log in SOC format
+
+**Runtime:** ~10-30 seconds for 29 tickets (varies based on API latency)
+
+### Example Run Output
+
+```
+Starting support triage pipeline...
+Loaded 29 tickets from support_tickets\support_tickets.csv
+Domain corpus: HackerRank=438, Claude=320, Visa=14, Global=0
+[01/29] Claude | Claude access lost
+    -> REPLIED | area=account_management | risk=25 | docs=3
+[02/29] HackerRank | Test Score Dispute
+    -> ESCALATED | attack=policy_violation | risk=80
+...
+Done. Output written to support_tickets\output.csv
+Replied: 24 | Escalated: 5
+```
 
 ---
 
-## Chat transcript logging
+## Limitations
 
-This repo ships with an `AGENTS.md` that any modern AI coding tool (Cursor, Claude Code, Codex, Gemini CLI, Copilot, etc.) will read. It instructs the tool to append every conversation turn to a single shared log file:
-
-| Platform       | Path                                              |
-| -------------- | ------------------------------------------------- |
-| macOS / Linux  | `$HOME/hackerrank_orchestrate/log.txt`            |
-| Windows        | `%USERPROFILE%\hackerrank_orchestrate\log.txt`    |
-
-You don't need to do anything to enable it — just use your AI tool normally. You'll upload this `log.txt` as your chat transcript at submission time.
-
----
-
-## Submission
-
-Submit on the HackerRank Community Platform:
-<https://www.hackerrank.com/contests/hackerrank-orchestrate-may26/challenges/support-agent/submission>
-
-You will upload **three** files:
-
-1. **Code zip** — zip your `code/` directory and upload it. Exclude virtualenvs, `node_modules`, build artifacts, the `data/` corpus, and the `support_tickets/` CSVs.
-2. **Predictions CSV** — your agent's output for `support_tickets/support_tickets.csv` (i.e. the populated `output.csv`).
-3. **Chat transcript** — the `log.txt` from the path in [Chat transcript logging](#chat-transcript-logging).
+1. **Keyword-Based Routing:** Classification relies on keyword matching; complex or novel tickets may be misrouted.
+2. **No Live Context:** Responses are only grounded in the bundled corpus; real-time product changes are not reflected.
+3. **Simple Retrieval:** Document ranking uses basic word overlap; semantic similarity would improve recall.
+4. **LLM Dependency:** Response quality depends on the underlying LLM model and API availability.
+5. **Language:** Currently optimized for English; multi-language support is not implemented.
+6. **No Machine Learning:** No learning from feedback or historical patterns.
+7. **Company Scope:** The system is trained on three companies (Claude, HackerRank, Visa); extending to new companies requires manual corpus updates.
 
 ---
 
-## Judge interview
+## Future Improvements
 
-After a successful submission, your AI Judge interview will happen within a few hours after the hackathon ends. It will stay open for the next 4 hours. 
-
-The AI Judge will have access to your submission and may ask about your approach, decisions, and how you used AI while building your solution. The interview will be 30 minutes long, and keeping your camera on is mandatory.
-
-Results will be announced on May 15, 2026
-
----
-
-## Evaluation criteria
-
-Submissions are scored across four dimensions: agent design (your `code/`), the AI Judge interview, output accuracy on `support_tickets/output.csv`, and AI fluency from your chat transcript.
-
-See [`evalutation_criteria.md`](./evalutation_criteria.md) for the full rubric.
+1. **Semantic Retrieval:** Replace word overlap with embeddings-based retrieval (e.g., using FAISS or Pinecone).
+2. **Fine-Tuned Model:** Train a custom LLM on historical ticket data to improve classification and response accuracy.
+3. **Feedback Loop:** Integrate user feedback to continuously improve routing and escalation thresholds.
+4. **Multi-Language Support:** Extend classification and retrieval to support multiple languages.
+5. **Real-Time Corpus Updates:** Implement live corpus refresh from official support APIs.
+6. **Interactive Dashboard:** Build a web UI for monitoring, logging, and manual review of escalated tickets.
+7. **Advanced Security:** Expand threat detection using graph-based anomaly detection or deep learning models.
+8. **Integration with Ticketing Systems:** Connect directly to Jira, Zendesk, Salesforce, or other support platforms.
+9. **Performance Optimization:** Add caching, batch processing, and async APIs for high-throughput scenarios.
+10. **Explainability:** Add detailed reasoning traces and confidence scores for each decision.
