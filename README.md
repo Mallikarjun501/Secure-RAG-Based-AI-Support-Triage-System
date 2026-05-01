@@ -234,34 +234,48 @@ Secure RAG-Based AI Support Triage System/
 ### Prerequisites
 
 - Python 3.8 or later
-- `pip` or `conda` for package management
-- Optional: OpenRouter API key for live response generation
+- `pip` for package management
+- Optional: OpenRouter / OpenAI API key for live response generation
 
-### Installation
+### Installation (recommended)
 
-1. Clone the repository:
+1. Clone the repository and open the project root:
    ```bash
    git clone https://github.com/Mallikarjun501/Secure-RAG-Based-AI-Support-Triage-System.git
-   cd Secure-RAG-Based-AI-Support-Triage-System
+   cd "Secure RAG-Based AI Support Triage System"
    ```
 
-2. Create a virtual environment:
+2. Create and activate a virtual environment:
+
+   - Windows PowerShell:
+     ```powershell
+     python -m venv .venv
+     Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned; .\.venv\Scripts\Activate.ps1
+     ```
+
+   - Windows CMD:
+     ```cmd
+     python -m venv .venv
+     .venv\Scripts\activate.bat
+     ```
+
+   - macOS / Linux:
+     ```bash
+     python -m venv .venv
+     source .venv/bin/activate
+     ```
+
+3. Install dependencies from the bundled manifest:
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r "AI Support Triage System/requirements.txt"
    ```
 
-3. Install dependencies:
+4. Copy the environment template and set secrets:
    ```bash
-   pip install pandas openai
+   copy "AI Support Triage System\.env.example" "AI Support Triage System\.env"  # Windows
    ```
-
-4. Set up environment variables:
-   ```bash
-   cp .env.example .env
-   ```
-   Then edit `.env` and set:
-   ```
+   Then edit `AI Support Triage System/.env` and set values, e.g.:
+   ```text
    OPENAI_API_KEY=sk-...
    OPENROUTER_MODEL=meta-llama/llama-3-8b-instruct
    MODE=secure
@@ -269,36 +283,49 @@ Secure RAG-Based AI Support Triage System/
 
 ### Running the Agent
 
-```bash
-python ..\run.py
-```
-
-If you prefer to run from inside the nested project folder, you can also use:
+Run from the repository root (recommended):
 
 ```bash
-python code/main.py
+python run.py
 ```
 
-**Output:**
-- `support_tickets/output.csv` — predictions for all input tickets
-- `log.txt` — detailed run log in SOC format
+Or run the pipeline module directly from inside the nested project folder:
 
-**Runtime:** ~10-30 seconds for 29 tickets (varies based on API latency)
-
-### Example Run Output
-
+```bash
+python -m code.main
 ```
-Starting support triage pipeline...
-Loaded 29 tickets from support_tickets\support_tickets.csv
-Domain corpus: HackerRank=438, Claude=320, Visa=14, Global=0
-[01/29] Claude | Claude access lost
-    -> REPLIED | area=account_management | risk=25 | docs=3
-[02/29] HackerRank | Test Score Dispute
-    -> ESCALATED | attack=policy_violation | risk=80
-...
-Done. Output written to support_tickets\output.csv
-Replied: 24 | Escalated: 5
+
+Outputs written by a run (by default) are placed under `AI Support Triage System/support_tickets/`:
+
+- `output.csv` — generated decisions for the input tickets
+- `log.txt` — SOC-style audit log
+
+### Tests
+
+Run the unit tests with the standard library test runner or `pytest`:
+
+```bash
+python -m unittest discover -s "AI Support Triage System/tests"
+# or
+pytest "AI Support Triage System/tests"
 ```
+
+### Cleanup: remove generated outputs from version control
+
+If `AI Support Triage System/support_tickets/output.csv` has been committed accidentally, remove it from tracking:
+
+```bash
+git rm --cached "AI Support Triage System/support_tickets/output.csv"
+git commit -m "chore: remove generated output.csv from repo"
+git push
+```
+
+### Notes
+
+- `requirements.txt` has been added to pin the minimal dependencies used by the project.
+- Prefer running `python run.py` from the repo root to ensure the nested package path is configured correctly.
+- If you intend to use a remote LLM, ensure `OPENAI_API_KEY` (or equivalent) is set in the copied `.env` file.
+
 
 ---
 
