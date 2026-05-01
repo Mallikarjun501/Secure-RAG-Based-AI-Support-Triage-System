@@ -188,38 +188,30 @@ The system is bundled with local support documentation for three companies:
 ## Project Structure
 
 ```text
-Secure RAG-Based AI Support Triage System/
-├── README.md                           # This file
-├── .env.example                        # Environment template
-├── .gitignore                          # Git ignore rules
-├── code/                               # Source code
-│   ├── __init__.py
-│   ├── main.py                         # Pipeline orchestration
-│   ├── classification.py               # Ticket routing
-│   ├── security.py                     # Threat detection & risk scoring
-│   ├── retrieval.py                    # Document loading & ranking
-│   └── llm.py                          # Response generation
-├── data/                               # Local support corpus
-│   ├── claude/                         # Claude Help Center docs
-│   │   ├── index.md
-│   │   ├── account-management/
-│   │   ├── api-faq/
-│   │   ├── privacy-and-legal/
-│   │   └── ...
-│   ├── hackerrank/                     # HackerRank support docs
-│   │   ├── index.md
-│   │   ├── billing/
-│   │   ├── screen/
-│   │   ├── interview/
-│   │   └── ...
-│   └── visa/                           # Visa support docs
-│       ├── index.md
-│       ├── support/
-│       └── ...
-└── support_tickets/                    # Input & output
-    ├── support_tickets.csv             # Input: tickets to triage
-    ├── sample_support_tickets.csv      # Reference examples
-    └── output.csv                      # Output: final decisions (generated)
+Secure RAG-Based AI Support Triage System/           ← Repository root
+├── run.py                                           ← Root launcher script
+└── AI Support Triage System/                        ← Main project folder
+    ├── README.md                                    ← This file
+    ├── requirements.txt                             ← Python dependencies
+    ├── .env.example                                 ← Environment template
+    ├── .gitignore                                   ← Git ignore rules
+    ├── code/                                        ← Source code
+    │   ├── __init__.py
+    │   ├── main.py                                  ← Pipeline orchestration
+    │   ├── classification.py                        ← Ticket routing
+    │   ├── security.py                              ← Threat detection & risk scoring
+    │   ├── retrieval.py                             ← Document loading & ranking
+    │   └── llm.py                                   ← Response generation
+    ├── data/                                        ← Local support corpus
+    │   ├── claude/                                  ← Claude Help Center docs (~320 files)
+    │   ├── hackerrank/                              ← HackerRank support docs (~438 files)
+    │   └── visa/                                    ← Visa support docs (~14 files)
+    ├── tests/                                       ← Unit tests
+    │   └── test_main.py
+    └── support_tickets/                             ← Input & output data
+        ├── support_tickets.csv                      ← Input: tickets to triage
+        ├── sample_support_tickets.csv               ← Reference examples
+        └── output.csv                               ← Output: final decisions (generated)
 ```
 
 **Generated Files (not committed):**
@@ -237,9 +229,29 @@ Secure RAG-Based AI Support Triage System/
 - `pip` for package management
 - Optional: OpenRouter / OpenAI API key for live response generation
 
-### Installation (recommended)
+### Important: Project Structure
 
-1. Clone the repository and open the project root:
+When you clone this repository, you get this folder layout:
+
+```
+Secure RAG-Based AI Support Triage System/  ← Repository root
+├── run.py                                   ← Root launcher (Windows/macOS/Linux)
+└── AI Support Triage System/                ← Main project folder (contains this README)
+    ├── README.md
+    ├── requirements.txt
+    ├── code/
+    ├── data/
+    ├── tests/
+    ├── support_tickets/
+    ├── .env.example
+    └── .gitignore
+```
+
+**All paths in this README are relative to the main project folder** (where this README is located).
+
+### Installation
+
+1. Clone the repository:
    ```bash
    git clone https://github.com/Mallikarjun501/Secure-RAG-Based-AI-Support-Triage-System.git
    cd "Secure RAG-Based AI Support Triage System"
@@ -247,72 +259,74 @@ Secure RAG-Based AI Support Triage System/
 
 2. Create and activate a virtual environment:
 
-   - Windows PowerShell:
+   - **Windows PowerShell:**
      ```powershell
      python -m venv .venv
      Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned; .\.venv\Scripts\Activate.ps1
      ```
 
-   - Windows CMD:
+   - **Windows CMD:**
      ```cmd
      python -m venv .venv
      .venv\Scripts\activate.bat
      ```
 
-   - macOS / Linux:
+   - **macOS / Linux:**
      ```bash
      python -m venv .venv
      source .venv/bin/activate
      ```
 
-3. Install dependencies from the bundled manifest:
+3. Install dependencies:
    ```bash
    pip install -r "AI Support Triage System/requirements.txt"
    ```
 
-4. Copy the environment template and set secrets:
+4. Set up environment variables:
    ```bash
    copy "AI Support Triage System\.env.example" "AI Support Triage System\.env"  # Windows
+   # or
+   cp "AI Support Triage System/.env.example" "AI Support Triage System/.env"  # macOS/Linux
    ```
-   Then edit `AI Support Triage System/.env` and set values, e.g.:
+   Then edit `AI Support Triage System/.env` with your API key:
    ```text
    OPENAI_API_KEY=sk-...
    OPENROUTER_MODEL=meta-llama/llama-3-8b-instruct
    MODE=secure
    ```
 
-### Running the Agent
+### Running the Pipeline
 
-Run from the repository root (recommended):
-
+**Option 1 (Recommended) — From the repository root:**
 ```bash
 python run.py
 ```
 
-Or run the pipeline module directly from inside the nested project folder:
-
+**Option 2 — From inside the project folder:**
 ```bash
-python -m code.main
+cd "AI Support Triage System"
+python code/main.py
 ```
 
-Outputs written by a run (by default) are placed under `AI Support Triage System/support_tickets/`:
-
-- `output.csv` — generated decisions for the input tickets
+**Output files** are written to `AI Support Triage System/support_tickets/`:
+- `output.csv` — triage decisions for all input tickets
 - `log.txt` — SOC-style audit log
 
-### Tests
+### Running Tests
 
-Run the unit tests with the standard library test runner or `pytest`:
-
+From the repository root:
 ```bash
 python -m unittest discover -s "AI Support Triage System/tests"
-# or
+```
+
+Or with pytest:
+```bash
 pytest "AI Support Triage System/tests"
 ```
 
-### Cleanup: remove generated outputs from version control
+### Cleanup: Remove Generated Output from Version Control
 
-If `AI Support Triage System/support_tickets/output.csv` has been committed accidentally, remove it from tracking:
+If `AI Support Triage System/support_tickets/output.csv` was committed by accident:
 
 ```bash
 git rm --cached "AI Support Triage System/support_tickets/output.csv"
@@ -320,11 +334,11 @@ git commit -m "chore: remove generated output.csv from repo"
 git push
 ```
 
-### Notes
+### Common Issues
 
-- `requirements.txt` has been added to pin the minimal dependencies used by the project.
-- Prefer running `python run.py` from the repo root to ensure the nested package path is configured correctly.
-- If you intend to use a remote LLM, ensure `OPENAI_API_KEY` (or equivalent) is set in the copied `.env` file.
+- **Import errors:** Ensure you're running from the repository root (where `run.py` exists).
+- **Missing `.env`:** Copy `.env.example` to `.env` inside the `AI Support Triage System` folder.
+- **API key not found:** Verify `OPENAI_API_KEY` is set in your `.env` file (fallback to no-API mode if unset).
 
 
 ---
